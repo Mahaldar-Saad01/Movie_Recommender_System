@@ -1,7 +1,7 @@
 # CineMatch Movie Recommender
-
+![Home](screenshots/home.png)
 CineMatch is a FastAPI movie recommendation web app built from the TMDB 5000 movie dataset. A user selects a movie, the backend finds similar movies using a precomputed similarity matrix, and the frontend displays polished recommendation cards with posters, release years, ratings, and overviews.
-
+![Recommendations](screenshots/recomendation.png)
 ## Features
 
 - Search/select a movie from the local movie list.
@@ -35,7 +35,7 @@ movie recomender/
 ```
 
 ## How Recommendation Works
-
+![vector_visualization](screenshots/vector_visualization.jpeg)
 The recommendation system is content-based. That means it recommends movies that have similar metadata and text features to the movie selected by the user.
 
 The original dataset contains information such as:
