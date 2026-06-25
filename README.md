@@ -20,9 +20,6 @@ movie recomender/
 |   |-- movie_list.json
 |   |-- vectors.csv
 |   |-- similarity.pkl
-|   |-- data/
-|   |   |-- tmdb_5000_movies.csv
-|   |   `-- tmdb_5000_credits.csv
 |   |-- services/
 |   |   |-- recommender.py
 |   |   `-- posterfetch.py
