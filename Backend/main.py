@@ -1,13 +1,16 @@
-from fastapi import FastAPI,Request,Form
+import json
+from pathlib import Path
+from urllib.parse import parse_qs
+
+from fastapi import FastAPI,Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse 
 from services.recommender import Recommend
-import pickle
-import requests
 
-templates=Jinja2Templates(directory="templates")
-movie_list=pickle.load(open("movie_list.pkl","rb"))
-movie_list=movie_list.tolist()
+BASE_DIR = Path(__file__).resolve().parent
+
+templates=Jinja2Templates(directory=str(BASE_DIR / "templates"))
+movie_list=json.loads((BASE_DIR / "movie_list.json").read_text(encoding="utf-8"))
 app=FastAPI()
 
 
@@ -19,11 +22,13 @@ async def home(request:Request):
     context={"movies": movie_list}
 )
 @app.post("/recommend",response_class=HTMLResponse)
-def getrecommend(request:Request,movie:str =Form(...)):
+async def getrecommend(request:Request):
+    form_data = parse_qs((await request.body()).decode("utf-8"))
+    movie = form_data.get("movie", [""])[0]
     recommended=Recommend(movie)
     return templates.TemplateResponse(
         name="recommend.html",
         request=request,
-        context={"recommend":recommended}
+        context={"recommend":recommended, "selected_movie": movie}
     )
 

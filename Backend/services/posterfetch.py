@@ -1,28 +1,95 @@
-from dotenv import load_dotenv
+from functools import lru_cache
 import os
-load_dotenv()
+from urllib.parse import quote
+
+from dotenv import load_dotenv
 import requests
-import json
 
-API_KEY = "8265bd1679663a7ea12ac168da84d2e8"
+load_dotenv()
 
-url = f"https://api.themoviedb.org/3/movie/5/images?api_key={API_KEY}"
+OMDB_API_KEY = os.getenv("OMDB_API_KEY", "")
+USER_AGENT = "MovieRecommender/1.0 (local development)"
+PLACEHOLDER_IMAGE = "data:image/svg+xml;utf8," + quote(
+    """<svg xmlns="http://www.w3.org/2000/svg" width="780" height="1170" viewBox="0 0 780 1170">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111827"/><stop offset="1" stop-color="#0f172a"/></linearGradient></defs>
+<rect width="780" height="1170" fill="url(#g)"/>
+<rect x="70" y="80" width="640" height="1010" rx="28" fill="none" stroke="#334155" stroke-width="8"/>
+<circle cx="390" cy="440" r="118" fill="#1f2937" stroke="#64748b" stroke-width="10"/>
+<path d="M330 390v100l92-50z" fill="#f8fafc"/>
+<text x="390" y="705" fill="#f8fafc" font-family="Arial, sans-serif" font-size="54" font-weight="700" text-anchor="middle">Poster</text>
+<text x="390" y="770" fill="#94a3b8" font-family="Arial, sans-serif" font-size="34" text-anchor="middle">not found</text>
+</svg>"""
+)
 
-try:
-    response = requests.get(url, timeout=10)
 
-    print("Status:", response.status_code)
-    print("URL:", response.url)
-
+def _get_json(url, params=None):
     try:
-        print(json.dumps(response.json(), indent=4))
-    except:
-        print(response.text)
+        response = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": USER_AGENT},
+            timeout=3,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException:
+        return {}
 
-except Exception as e:
-    print("ERROR:", e)
+
+@lru_cache(maxsize=512)
+def fetch_poster_from_omdb(title, year=None):
+    if not OMDB_API_KEY or not title:
+        return ""
+
+    params = {"apikey": OMDB_API_KEY, "t": title, "type": "movie"}
+    if year and year != "N/A":
+        params["y"] = year
+
+    data = _get_json("https://www.omdbapi.com/", params)
+    poster = data.get("Poster", "")
+    if not poster or poster == "N/A":
+        return ""
+    return poster
 
 
-# def fetch_poster(movie_id):
-#     API_KEY = os.getenv("API_KEY")
-#     url=https://api.themoviedb.org/3/movie/{movie_id}/images?api_key=API_KEY
+@lru_cache(maxsize=512)
+def fetch_poster_from_wikipedia(title, year=None):
+    if not title:
+        return ""
+
+    searches = [
+        f"{title} {year} film" if year and year != "N/A" else "",
+        f"{title} film",
+        title,
+    ]
+
+    for search in [item for item in searches if item]:
+        wiki_data = _get_json(
+            "https://en.wikipedia.org/w/api.php",
+            {
+                "action": "query",
+                "format": "json",
+                "generator": "search",
+                "gsrsearch": search,
+                "gsrlimit": 5,
+                "prop": "pageimages",
+                "pithumbsize": 780,
+                "pilicense": "any",
+            },
+        )
+        pages = wiki_data.get("query", {}).get("pages", {})
+        for page in sorted(pages.values(), key=lambda item: item.get("index", 99)):
+            thumbnail = page.get("thumbnail", {})
+            source = thumbnail.get("source")
+            if source:
+                return source
+
+    return ""
+
+
+def fetch_poster(title, year=None):
+    return (
+        fetch_poster_from_omdb(title, year)
+        or fetch_poster_from_wikipedia(title, year)
+        or PLACEHOLDER_IMAGE
+    )
